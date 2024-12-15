@@ -15,6 +15,7 @@ logging.basicConfig(level=logging.DEBUG)
 G = None  # Graph is loaded lazily
 
 def load_graph():
+    """Loads the Bengaluru street graph from cache or downloads it if not available."""
     global G
     if G is None:
         GRAPH_FILE = 'bengaluru_graph.pkl'
@@ -33,10 +34,12 @@ def load_graph():
 
 @app.route('/')
 def home():
+    """Simple endpoint to verify the server is running."""
     return "Flask server is running!"
 
 @app.route('/calculate-route', methods=['POST'])
 def calculate_route():
+    """Endpoint to calculate shortest route(s) between origin and destination."""
     try:
         data = request.json
         origin = data['origin']
@@ -70,6 +73,7 @@ def calculate_route():
         return jsonify({'error': 'Failed to calculate route', 'details': str(e)}), 500
 
 if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 5000))  # Use the PORT environment variable
+    # Dynamically bind to the port provided by Render or default to 5000 for local testing
+    port = int(os.environ.get("PORT", 5000))
     app.run(debug=True, host="0.0.0.0", port=port)
 
