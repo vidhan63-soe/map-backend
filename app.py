@@ -1,4 +1,3 @@
-'''
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import osmnx as ox
@@ -13,84 +12,24 @@ CORS(app, resources={r"/calculate-route": {"origins": "*"}})  # Enable CORS for 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
 
-# Load or download the Bengaluru street network
-GRAPH_FILE = 'bengaluru_graph.pkl'
+G = None  # Graph is loaded lazily
 
-if os.path.exists(GRAPH_FILE):
-    app.logger.info("Loading graph from cache...")
-    with open(GRAPH_FILE, 'rb') as f:
-        G = pickle.load(f)
-else:
-    app.logger.info("Downloading Bengaluru street network...")
-    G = ox.graph_from_place('Bangalore, Karnataka, India', network_type='drive')
-    with open(GRAPH_FILE, 'wb') as f:
-        pickle.dump(G, f)
-    app.logger.info("Graph downloaded and cached.")
-
-@app.route('/')
-def home():
-    return "Flask server is running!"
-
-@app.route('/calculate-route', methods=['POST'])
-def calculate_route():
-    try:
-        data = request.json
-        origin = data['origin']
-        destination = data['destination']
-
-        # Validate input data
-        if not origin or not destination or len(origin) != 2 or len(destination) != 2:
-            raise ValueError("Invalid origin or destination coordinates")
-
-        # Find nearest nodes
-        app.logger.debug(f"Finding nearest nodes for origin: {origin}, destination: {destination}")
-        origin_node = ox.distance.nearest_nodes(G, origin[1], origin[0])
-        dest_node = ox.distance.nearest_nodes(G, destination[1], destination[0])
-
-        # Calculate shortest path
-        app.logger.debug(f"Calculating shortest path between nodes {origin_node} and {dest_node}")
-        route = nx.shortest_path(G, origin_node, dest_node, weight='length')
-
-        # Convert route to lat/lng coordinates
-        route_coords = [(G.nodes[node]['y'], G.nodes[node]['x']) for node in route]
-        app.logger.debug(f"Route calculated with coordinates: {route_coords}")
-
-        return jsonify({'coordinates': route_coords})
-
-    except Exception as e:
-        app.logger.error(f"Error calculating route: {e}")
-        return jsonify({'error': 'Failed to calculate route', 'details': str(e)}), 500
-
-if __name__ == '__main__':
-    app.run(debug=True, port=5000)
-'''
-from flask import Flask, request, jsonify
-from flask_cors import CORS
-import osmnx as ox
-import networkx as nx
-import logging
-import pickle
-import os
-
-app = Flask(__name__)
-CORS(app, resources={r"/calculate-route": {"origins": "*"}})  # Enable CORS for specific route
-
-# Configure logging
-logging.basicConfig(level=logging.DEBUG)
-
-# Load or download the Bengaluru street network
-GRAPH_FILE = 'bengaluru_graph.pkl'
-
-if os.path.exists(GRAPH_FILE):
-    app.logger.info("Loading graph from cache...")
-    with open(GRAPH_FILE, 'rb') as f:
-        G = pickle.load(f)
-else:
-    app.logger.info("Downloading Bengaluru street network...")
-    G = ox.graph_from_place('Bangalore, Karnataka, India', network_type='drive')
-    with open(GRAPH_FILE, 'wb') as f:
-        pickle.dump(G, f)
-    app.logger.info("Graph downloaded and cached.")
+def load_graph():
+    global G
+    if G is None:
+        GRAPH_FILE = 'bengaluru_graph.pkl'
+        if os.path.exists(GRAPH_FILE):
+            app.logger.info("Loading graph from cache...")
+            with open(GRAPH_FILE, 'rb') as f:
+                G = pickle.load(f)
+        else:
+            app.logger.info("Downloading Bengaluru street network...")
+            G = ox.graph_from_place('Bangalore, Karnataka, India', network_type='drive')
+            G = ox.simplify_graph(G)  # Simplify graph to reduce size
+            with open(GRAPH_FILE, 'wb') as f:
+                pickle.dump(G, f)
+            app.logger.info("Graph downloaded and cached.")
+    return G
 
 @app.route('/')
 def home():
@@ -107,6 +46,8 @@ def calculate_route():
         # Validate input data
         if not origin or not destination or len(origin) != 2 or len(destination) != 2:
             raise ValueError("Invalid origin or destination coordinates")
+
+        G = load_graph()  # Load the graph when needed
 
         # Find nearest nodes
         app.logger.debug(f"Finding nearest nodes for origin: {origin}, destination: {destination}")
@@ -129,5 +70,6 @@ def calculate_route():
         return jsonify({'error': 'Failed to calculate route', 'details': str(e)}), 500
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    port = int(os.environ.get("PORT", 5000))  # Use the PORT environment variable
+    app.run(debug=True, host="0.0.0.0", port=port)
 
