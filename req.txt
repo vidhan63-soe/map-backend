@@ -1,0 +1,4 @@
+flask
+osmnx
+networkx
+flask-cors
