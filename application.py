@@ -74,6 +74,6 @@ def calculate_route():
 
 if __name__ == '__main__':
     # Dynamically bind to the port provided by Render or default to 5000 for local testing
-    port = int(os.environ.get("PORT", 5000))
+    port = int(os.environ.get("PORT", 8080))
     app.run(debug=True, host="0.0.0.0", port=port)
 
